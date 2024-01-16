@@ -43,3 +43,5 @@ And create a new Hardhat project by running the following command:
 ```bash
 npx hardhat init
 ```
+
+> **Note:** make sure you say yes when Hardhat asks you to install `@nomiclabs/hardhat-toolbox`. This dependency contains all the tools that you will need!
