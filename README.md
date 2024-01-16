@@ -170,3 +170,52 @@ Also in Solidity like in Javascript, it is often more preferable to import speci
 ```js
 import {LSP7Mintable} from "@lukso/lsp-smart-contracts/contracts/LSP7DigitalAsset/presets/LSP7Mintable.sol";
 ```
+
+### Add LSP7 to our Token
+
+The Solidity documentations describes the Solidity language as a _"Contract Oriented Language"_, meaning its syntax works similarly as Object Oriented Programming languages, with the exceptions that instead of classes, the objects that can be created represent smart contracts.
+
+Similarly to Object Oriented programming, contracts have inheritance. This is how complex contracts like Universal Profile, Digital Assets and NFT 2.0 can be created: through multiple differents independent modules (LSP4 Metadata, LSP14 Ownable 2 Steps, ERC725Y, etc...) that the final contract to deploy will inherit.
+
+To implement our `LSP7Mintable` in our token, we will add it into the inheritance. This can be done by extending the contract using the `is` keyword.
+
+```js
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.20;
+
+import {LSP7Mintable} from "@lukso/lsp-smart-contracts/contracts/LSP7DigitalAsset/presets/LSP7Mintable.sol";
+
+contract MyToken is LSP7Mintable {
+    // smart contract logic will go here...
+} 
+```
+
+If you try to compile this, you will get a new error.
+
+```log
+No arguments passed to the base constructor. Specify the arguments or mark "MyToken" as abstract.
+```
+
+_TODO: explain about `constructor`_
+
+## 4. Connect Hardhat to a custom network / chain
+
+> Reference: https://hardhat.org/tutorial/deploying-to-a-live-network#_7-deploying-to-a-live-network
+
+In your `hardhat.config.ts`, setup a new network as follow:
+
+```ts
+module.exports = {
+  solidity: "0.8.23",
+  networks: {
+    sepolia: {
+      url: `https://rpc.testnet.lukso.network`,
+      accounts: [TESTNET_PRIVATE_KEY]
+    }
+  }
+};
+```
+
+## 5. Verify a deployed contract
+
+TBD
