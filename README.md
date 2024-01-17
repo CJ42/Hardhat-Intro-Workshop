@@ -11,9 +11,9 @@ A repository used as a workshop to learn the basics of Hardhat and smart contrac
 
 2. Create a basic Solidity contract: a LSP7 Token + compile it
 
-3. How you deploy a smart contract (= setup a deployment script)
+3. How to setup Hardhat and connect it to a custom chain
 
-4. How to setup Hardhat and connect it to a custom chain
+4. How you deploy a smart contract (= setup a deployment script)
 
 5. How to verify a contract with Hardhat
 
@@ -196,26 +196,215 @@ If you try to compile this, you will get a new error.
 No arguments passed to the base constructor. Specify the arguments or mark "MyToken" as abstract.
 ```
 
-_TODO: explain about `constructor`_
+We therefore need to set the parameters on deployment. This can be done by writing a `constructor` (like in OOP!). A `constructor` inside a Solidity `contract` define a block of code logic that will run only once, when the contract is being deployed. This is useful in case when you want to deploy a contract and instantiate some initial default parameters.
 
-## 4. Connect Hardhat to a custom network / chain
+This is what we will do for our token contract, we will define:
+
+- its name
+- its symbol
+- the address that control the token
+- the type of asset it is (Token, NFT or Collection)
+- if the token can be divided in fractional units (LSP7 specific)
+
+```js
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.20;
+
+import {LSP7Mintable} from "@lukso/lsp-smart-contracts/contracts/LSP7DigitalAsset/presets/LSP7Mintable.sol";
+
+contract MyToken is LSP7Mintable {
+
+  constructor(
+      string memory name,
+      string memory symbol,
+      address contractOwner,
+      uint256 lsp4TokenType,
+      bool isNonDivisible
+  ) LSP7Mintable(
+      name,
+      symbol,
+      contractOwner,
+      lsp4TokenType,
+      isNonDivisible,
+  ) {}
+
+  // smart contract logic will go here...
+} 
+```
+
+## 3. Connect Hardhat to a custom network / chain
 
 > Reference: https://hardhat.org/tutorial/deploying-to-a-live-network#_7-deploying-to-a-live-network
 
 In your `hardhat.config.ts`, setup a new network as follow:
 
 ```ts
-module.exports = {
-  solidity: "0.8.23",
+const config: HardhatUserConfig = {
+  solidity: "0.8.20",
   networks: {
-    sepolia: {
+    luksoTestnet: {
       url: `https://rpc.testnet.lukso.network`,
       accounts: [TESTNET_PRIVATE_KEY]
     }
   }
 };
+
+export default config;
+```
+
+We now need to load our EOA into our Hardhat development environnement, so that we can use as a deployer in our future deployment scripts.
+
+```ts
+const TESTNET_PRIVATE_KEY = "0x...";
+
+const config: HardhatUserConfig = {
+  solidity: "0.8.20",
+  networks: {
+    luksoTestnet: {
+      url: `https://rpc.testnet.lukso.network`,
+      accounts: [TESTNET_PRIVATE_KEY]
+    }
+  }
+};
+
+export default config;
+```
+
+Although this is testnet, **you must never push private keys into a Github repository** as a general blockchain development practice.
+
+Install `dotenv` as a dev dependency and load it in your Hardhat config. 
+
+
+## 4. Deploy our contract on Testnet
+
+We will now write a Hardhat deployment script to deploy our token contract on the LUKSO Testnet.
+
+Create a new file under the `scripts/` folder called `deployToken.ts`. We will start by writing the following:
+
+```js
+import { ethers } from "hardhat";
+
+async function deployToken() {
+    const [deployer] = await ethers.getSigners();
+
+    console.log("Deploying contracts with the account:", deployer.address);
+
+    const token = await ethers.deployContract("MyToken", [
+        "Green Plants", // token name
+        "GPT", // token symbol
+        deployer.address, // contract owner
+        0, // token type = TOKEN
+        false // isNonDivisible?
+    ]);
+
+    console.log("Token address:", await token.getAddress());
+}
+
+deployToken()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+```
+
+You can then run the following command to deploy your Token contract on LUKSO Testnet. **Make sure your deployer address has some LYX in its balance.** If not, you can request some from the Testnet Faucet.
+
+```bash
+npx hardhat run ./scripts/deployTokens.ts --network luksoTestnet
+```
+
+Here is an example of the final code, where we also read and write the metadata:
+
+```js
+import { ethers } from "hardhat";
+
+import { LSP4_TOKEN_TYPES, ERC725YDataKeys } from "@lukso/lsp-smart-contracts";
+
+async function deployToken() {
+    const [deployer] = await ethers.getSigners();
+
+    console.log("Deploying contracts with the account:", deployer.address);
+
+    const token = await ethers.deployContract("MyToken", [
+        "Green Plants", // token name
+        "GPT", // token symbol
+        deployer.address, // contract owner
+        LSP4_TOKEN_TYPES.TOKEN, // token type = TOKEN
+        false // isNonDivisible?
+    ]);
+
+    await token.waitForDeployment();
+
+    console.log("Token address:", await token.getAddress());
+
+    // read metadata
+    const metadata = await token.getData(ERC725YDataKeys.LSP4["LSP4Metadata"]);
+    console.log("Token metadata:", metadata);
+
+    // write metadata (should be a VerifiableURI)
+    const tx = await token.setData(ERC725YDataKeys.LSP4["LSP4Metadata"], "0xcafecafe");
+    const receipt = await tx.wait();
+
+    console.log("Token metadata updated:", receipt);
+}
+
+deployToken()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
 ```
 
 ## 5. Verify a deployed contract
 
-TBD
+Let's use a new command to verify the token contract we have deployed! Run the following command below:
+
+```bash
+npx hardhat verify --help
+```
+
+To verify a contract, we need to do the following things:
+
+1. setup blockscout API in our `hardhat.config.ts`
+2. create a file that contains the constructor arguments `constructor.js`
+3. run the command to verify the contract
+
+### 5.1 Setup Blockscout API in `hardhat.config.ts`
+
+Add the following property in your Hardhat config file.
+
+```js
+etherscan: {
+    apiKey: 'no-api-key-needed',
+    customChains: [
+      {
+        network: 'luksoTestnet',
+        chainId: 4201,
+        urls: {
+          apiURL: 'https://api.explorer.execution.testnet.lukso.network/api',
+          browserURL: 'https://explorer.execution.testnet.lukso.network/',
+        },
+      },
+    ],
+  },
+```
+
+### 5.2 Create `constructor.js`
+
+```js
+module.exports = [ 
+    'Green Plants', 
+    'GPT', 
+    '0x03492D5fF5e86cc06b4a40F8c0A0F72B730f50b9', 
+    0,
+    false 
+];
+```
+
+### 5.3 Run command to verify the contract
+
+```bash
+npx hardhat verify <token-contract-address> --constructor-args ./scripts/constructor.js --network luksoTestnet
+```
