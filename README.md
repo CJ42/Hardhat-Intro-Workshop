@@ -1,4 +1,4 @@
-# Hardhat-Intro-Workshop
+# Hardhat Intro Workshop
 A repository used as a workshop to learn the basics of Hardhat and smart contract development.
 
 ![Hardhat development environment wallpaper](https://miro.medium.com/v2/resize:fit:1200/1*Fe-twcLBfV79OGtQ1vVkkQ.png)
@@ -391,7 +391,7 @@ etherscan: {
   },
 ```
 
-### 5.2 Create `constructor.js`
+### 5.2 Create `constructor.js`
 
 ```js
 module.exports = [ 
